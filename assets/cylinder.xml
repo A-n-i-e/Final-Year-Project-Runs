@@ -1,0 +1,11 @@
+<body name="object" pos="0.55 0.0 0.04">
+    <freejoint/>
+    <geom
+        name="object_geom"
+        type="cylinder"
+        size="0.025 0.04"
+        mass="0.06"
+        friction="1.0 0.005 0.0001"
+        rgba="0 0 1 1"
+    />
+</body>

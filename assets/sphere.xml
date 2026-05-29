@@ -1,0 +1,11 @@
+<body name="object" pos="0.55 0.0 0.03">
+    <freejoint/>
+    <geom
+        name="object_geom"
+        type="sphere"
+        size="0.03"
+        mass="0.05"
+        friction="1.0 0.005 0.0001"
+        rgba="0 1 0 1"
+    />
+</body>

@@ -232,7 +232,7 @@ class PandaPickEnv(gym.Env):
     # ------------------------------------------------------------------
     # Grasp detection — body-contact based
     # ------------------------------------------------------------------
-    def _object_is_grasped(self) -> bool:
+    def c(self) -> bool:
         """
         Return True when BOTH finger bodies are simultaneously contacting
         the active object body.
@@ -471,22 +471,6 @@ class PandaPickEnv(gym.Env):
         Failure (fell off table)   obj_z < table - 5cm  -50,  terminates
         Failure (arm wandered)     dist(ee,obj) > 80 cm -50,  terminates
 
-        Bug fixes vs. original
-        ──────────────────────
-        Bug 1  Lift reward now requires _object_is_grasped() (body contact).
-               Old code used gripper_open < 0.3, giving +0.6 free reward/step.
-
-        Bug 2  Grasp bonus is one-time via self._grasp_rewarded flag (reset in
-               reset()).  Old code gave +5 every step → up to +1 000/episode.
-
-        Bug 3  Gripper shaping uses exp(-dist / 0.05): essentially zero when
-               the EE is > ~15 cm from the object.  Old binary threshold at
-               0.10 m let the agent earn +60 just by opening the gripper far
-               from the object.
-
-        Bug 4  Goal pull (-0.5 * dist_obj_goal) only fires when the object is
-               actually grasped.  Previously it pulled the arm (not the object)
-               toward the goal even before any contact.
         """
         ee_pos  = self.data.site_xpos[self._ee_site_id]
         obj_pos = self.data.xpos[self._obj_body_id]

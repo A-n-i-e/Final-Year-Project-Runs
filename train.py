@@ -109,10 +109,8 @@ class ProgressCallback(BaseCallback):
         return True   # returning False would stop training
 
 
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
 
+# Main
 def parse_args():
     parser = argparse.ArgumentParser(description="Train PPO on PandaPickEnv")
     parser.add_argument("--timesteps",   type=int,   default=500_000,
@@ -150,9 +148,8 @@ def main():
     print("=" * 60)
     
 
-    # ------------------------------------------------------------------
+
     # Training environment  (vectorised, optionally normalised)
-    # ------------------------------------------------------------------
     train_env = make_vec_env(
         PandaPickEnv,
         n_envs=args.n_envs,
@@ -168,9 +165,9 @@ def main():
             clip_obs=10.0,
         )
 
-    # ------------------------------------------------------------------
+
+
     # Evaluation environment  (single env, same normalisation stats)
-    # ------------------------------------------------------------------
     eval_env = make_vec_env(
         PandaPickEnv,
         n_envs=1,
@@ -192,9 +189,9 @@ def main():
         eval_env.obs_rms = train_env.obs_rms
         eval_env.ret_rms = train_env.ret_rms
 
-    # ------------------------------------------------------------------
+
+
     # Model Selection
-    # ------------------------------------------------------------------
     AlgoClass = algo_dict.get(args.algo)
     if not AlgoClass:
         raise ValueError(f"Unknown algorithm: {args.algo}")
@@ -206,9 +203,9 @@ def main():
         seed=args.seed,
         **hyperparams[args.algo]   # This unpacks the right hyperparameters
     )
-    # ------------------------------------------------------------------
+
+
     # Callbacks
-    # ------------------------------------------------------------------
     eval_callback = EvalCallback(
         eval_env,
         best_model_save_path=model_dir,
@@ -227,9 +224,8 @@ def main():
 
     progress_callback = ProgressCallback(print_every=10_000)
 
-    # ------------------------------------------------------------------
+
     # Train
-    # ------------------------------------------------------------------
     print("\nStarting training...\n")
     model.learn(
         total_timesteps=args.timesteps,
@@ -238,9 +234,8 @@ def main():
         reset_num_timesteps=True,
     )
 
-    # ------------------------------------------------------------------
+
     # Save final model (and normalisation stats if used)
-    # ------------------------------------------------------------------
     final_path = os.path.join(model_dir, "final_model")
     model.save(final_path)
     print(f"\nFinal model saved → {final_path}.zip")

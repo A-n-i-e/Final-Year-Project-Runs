@@ -27,30 +27,6 @@ Key design decisions
 Observation space : 36-dimensional (see _get_obs for full breakdown)
 Action space      : 4-dimensional  [dx, dy, dz, gripper]
 
-Reward-function fixes applied (vs. original)
---------------------------------------------
-Bug 1 – Lift reward now gated on _object_is_grasped() (body contact),
-         not just gripper_open < 0.3. The old code gave +0.6/step from
-         step 1 purely by keeping the fingers closed.
-
-Bug 2 – Grasp bonus (+5) is now one-time per episode via self._grasp_rewarded.
-         The old code rewarded it every step as long as action[3] < 0,
-         enabling ~+1 000 of free reward over 200 steps.
-
-Bug 3 – Gripper shaping now uses exponential decay exp(-dist / 0.05)
-         so the signal is near-zero when the EE is far from the object.
-         The old binary threshold at 0.10 m let the agent harvest +0.3/step
-         indefinitely just by opening the gripper far away.
-
-Bug 4 – The -0.5 * dist_obj_goal pull is now gated on is_grasped so the
-         agent is not incorrectly pulled toward the lift target with an
-         open gripper before it has even touched the object.
-
-Bug 5 – is_success now uses a geometric check (height + proximity + contact)
-         instead of "reward > 50" which accumulated shaping could fake.
-
-Table fix – TABLE_XML body moved from z=0.2 to z=0.1 so the table bottom
-            sits on the floor (z=0). TABLE_HEIGHT updated from 0.30 → 0.20.
 """
 
 import os
@@ -103,10 +79,7 @@ OBJECT_XMLS = {
         </body>""",
 }
 
-# ---------------------------------------------------------------------------
-# FIX (Table): body centre at z=0.1, half-height=0.1  → bottom at z=0.0
-#              (previously z=0.2 → bottom at z=0.10, i.e. floating in air)
-# ---------------------------------------------------------------------------
+
 TABLE_XML = """
     <body name="table" pos="0.45 0 0.1">
       <geom name="table_geom" type="box" size="0.35 0.35 0.1"
@@ -114,12 +87,9 @@ TABLE_XML = """
             friction="1 0.005 0.0001"/>
     </body>"""
 
-# ---------------------------------------------------------------------------
-# FIX (Table): TABLE_HEIGHT = body_z (0.1) + geom_half_height (0.1) = 0.20
-#              (was 0.30 to match the old floating body at z=0.2)
-# ---------------------------------------------------------------------------
+
 TABLE_HEIGHT            = 0.20   # metres — top surface of the table in world frame
-LIFT_HEIGHT_THRESHOLD   = 0.15   # agent must raise object this far above the table top
+LIFT_HEIGHT_THRESHOLD   = 0.20   # agent must raise object this far above the table top
 
 
 def _build_xml(base_xml_path: str) -> str:
@@ -174,7 +144,7 @@ class PandaPickEnv(gym.Env):
     JOINT_NAMES   = ["joint1", "joint2", "joint3",
                      "joint4", "joint5", "joint6", "joint7"]
     EE_SITE_NAME  = "pinch"
-    BASE_XML_PATH = "mujoco_menagerie/franka_emika_panda/scene.xml"
+    BASE_XML_PATH = "franka_emika_panda/scene.xml"
 
     # Gripper pointing straight down (w=0, x=0.707, y=-0.707, z=0)
     EE_TARGET_QUAT = np.array([0.0, 0.7071068, -0.7071068, 0.0])
@@ -235,7 +205,7 @@ class PandaPickEnv(gym.Env):
             self.model.joint(n).qposadr[0] for n in self.JOINT_NAMES
         ]
         self._qvel_indices = [
-            self.model.joint(n).dofadr[0] for n in self.JOINT_NAMES
+            self.model.joint(n).dofatedr[0] for n in self.JOINT_NAMES
         ]
 
         # ── End-effector site ────────────────────────────────────────────

@@ -205,7 +205,7 @@ class PandaPickEnv(gym.Env):
             self.model.joint(n).qposadr[0] for n in self.JOINT_NAMES
         ]
         self._qvel_indices = [
-            self.model.joint(n).dofatedr[0] for n in self.JOINT_NAMES
+            self.model.joint(n).dofadr[0] for n in self.JOINT_NAMES
         ]
 
         # ── End-effector site ────────────────────────────────────────────

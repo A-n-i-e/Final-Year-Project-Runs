@@ -1,46 +1,49 @@
 """
 visualise.py
 ============
-Load a trained PPO model and watch it run in the MuJoCo interactive viewer.
+Visualize a trained agent on the Panda pick-and-lift environmentand watch it run in the MuJoCo interactive viewer.
 
 Usage
 -----
-    # With VecNormalize stats (if you trained with normalisation on)
-    python visualise.py --model models/panda_ppo/best_model.zip \
-                        --stats models/panda_ppo/vec_normalize.pkl
+    # Recommended (auto path based on algorithm)
+    For PPO:
+    python visualise.py --algo PPO
 
-    # Without normalisation stats
-    python visualise.py --model models/panda_ppo/best_model.zip
+    For SAC:
+    python visualise.py --algo SAC
 
-    # Fix the object type instead of randomising each episode
-    python visualise.py --model models/panda_ppo/best_model.zip \
-                        --object cube
+    For TD3:
+    python visualise.py --algo TD3
 
-    # Run a fixed number of episodes then exit
-    python visualise.py --model models/panda_ppo/best_model.zip \
-                        --episodes 5
+    # With fixed object and limited episodes
+    python visualise.py --algo SAC --object cube --episodes 10
 """
 
 import argparse
 import time
+import mujoco
 
-import numpy as np
-from stable_baselines3 import PPO
+from stable_baselines3 import PPO, SAC, TD3
 from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 
 from envs.panda_pick_env import PandaPickEnv
 
 
-# ---------------------------------------------------------------------------
-# Args
-# ---------------------------------------------------------------------------
+algo_dict = {
+    "PPO": PPO,
+    "SAC": SAC,
+    "TD3": TD3,
+}
+
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Visualise trained PPO agent")
-    parser.add_argument("--model",    type=str, required=True,
-                        help="Path to .zip model file")
+    parser = argparse.ArgumentParser(description="Visualise trained Panda Emika Franka agent")
+    parser.add_argument("--algo", type=str, default="PPO", choices=list(algo_dict.keys()),
+                        help="Algorithm to use for training and visualisation (default: PPO)")
+    parser.add_argument("--model",    type=str, default=None,
+                        help="Full path to .zip model file (overrides auto-path based on algo)")
     parser.add_argument("--stats",    type=str, default=None,
-                        help="Path to vec_normalize.pkl (if training used normalisation)")
+                        help="Path to vec_normalize.pkl")
     parser.add_argument("--episodes", type=int, default=0,
                         help="Number of episodes to run (0 = run forever)")
     parser.add_argument("--object",   type=str, default=None,
@@ -54,89 +57,84 @@ def parse_args():
 
 
 # ---------------------------------------------------------------------------
-# Fixed-object wrapper (optional)
+# Fixed Object Wrapper
 # ---------------------------------------------------------------------------
-
 class FixedObjectEnv(PandaPickEnv):
-    """Thin wrapper that always spawns the same object type."""
     def __init__(self, object_name: str, **kwargs):
         super().__init__(**kwargs)
         self._fixed_object = object_name
 
     def reset(self, seed=None, options=None):
         obs, info = super().reset(seed=seed, options=options)
-        # If the randomised object doesn't match, reload with the fixed one
         if self.current_object_name != self._fixed_object:
             self.current_object_name = self._fixed_object
-            self.current_object_idx  = self.OBJECT_NAMES.index(self._fixed_object)
+            # Force reload the desired object
+            self.current_object_idx = self.OBJECT_NAMES.index(self._fixed_object)
             self._load_model(self._fixed_object)
-            import mujoco
+
+            # Reset simulation
             mujoco.mj_resetData(self.model, self.data)
-            # Re-randomise position
+
+            # Randomize position slightly
             obj_x = float(self.np_random.uniform(0.3, 0.55))
             obj_y = float(self.np_random.uniform(-0.2, 0.2))
-            self.data.qpos[self._obj_qpos_start + 0] = obj_x
-            self.data.qpos[self._obj_qpos_start + 1] = obj_y
-            self.data.qpos[self._obj_qpos_start + 2] = 0.03
-            self.data.qpos[self._obj_qpos_start + 3] = 1.0
-            self.data.qpos[self._obj_qpos_start + 4] = 0.0
-            self.data.qpos[self._obj_qpos_start + 5] = 0.0
-            self.data.qpos[self._obj_qpos_start + 6] = 0.0
+            self.data.qpos[self._obj_qpos_start:self._obj_qpos_start+7] = [obj_x, obj_y, 0.03, 1, 0, 0, 0]
             mujoco.mj_forward(self.model, self.data)
             obs = self._get_obs()
-        return obs, {"object_name": self._fixed_object}
+        return obs, info
 
 
-# ---------------------------------------------------------------------------
 # Main
-# ---------------------------------------------------------------------------
 
 def main():
     args = parse_args()
 
+    # Auto path building based on folder structure if user didn't specify model
+    if args.model is None:
+        base = f"models/panda_{args.algo.lower()}"
+        args.model = f"{base}/best_model.zip"
+        if args.stats is None:
+            args.stats = f"{base}/vec_normalize.pkl"
+
     print("=" * 60)
+    print(f"  Algorithm : {args.algo}")
     print(f"  Model    : {args.model}")
     print(f"  Stats    : {args.stats or 'none (no normalisation)'}")
     print(f"  Object   : {args.object or 'random'}")
     print(f"  Episodes : {'∞' if args.episodes == 0 else args.episodes}")
     print("=" * 60)
 
-    # ------------------------------------------------------------------
-    # Build the raw env
-    # ------------------------------------------------------------------
+
+   # Create environment
     if args.object:
         env_cls = lambda: FixedObjectEnv(args.object, max_episode_steps=200, render_mode="human")
     else:
         env_cls = lambda: PandaPickEnv(max_episode_steps=200, render_mode="human")
 
 
-    raw_env = DummyVecEnv([env_cls])
+    vec_env = DummyVecEnv([env_cls])
 
-    # ------------------------------------------------------------------
-    # Wrap with VecNormalize if stats were saved during training
-    # ------------------------------------------------------------------
+    # Load normalisation stats
     if args.stats:
         print(f"\nLoading normalisation stats from {args.stats}...")
-        vec_env = VecNormalize.load(args.stats, raw_env)
+        vec_env = VecNormalize.load(args.stats, vec_env)
         vec_env.training = False      # freeze stats — do NOT update them
         vec_env.norm_reward = False   # no need to normalise reward at eval
     else:
-        vec_env = raw_env
+        print("\nWarning: No normalisation stats provided, running without normalisation.")
 
-    # ------------------------------------------------------------------
-    # Load the PPO model
-    # ------------------------------------------------------------------
-    print(f"Loading model from {args.model}...\n")
-    model = PPO.load(args.model, env=vec_env)
+    # Load model with correct algorithm
+    AlgoClass = algo_dict[args.algo]
+    model = AlgoClass.load(args.model, env=vec_env)
 
-    # ------------------------------------------------------------------
+    print(f"\nStarting visualization... (Close MuJoCo window to stop)\n")
+
+
+
     # Run episodes
-    # ------------------------------------------------------------------
     ep          = 0
     total_steps = 0
     successes   = 0
-
-    print("Controls: close the MuJoCo viewer window to stop.\n")
 
     while True:
         ep += 1
@@ -146,8 +144,6 @@ def main():
         ep_steps    = 0
         ep_success  = False
 
-        # Pull the underlying env to read object name
-        underlying = vec_env.envs[0] if hasattr(vec_env, "envs") else None
 
         while not done:
             action, _ = model.predict(obs, deterministic=args.deterministic)
@@ -180,9 +176,8 @@ def main():
         if args.episodes > 0 and ep >= args.episodes:
             break
 
-    # ------------------------------------------------------------------
+
     # Summary
-    # ------------------------------------------------------------------
     print("\n" + "=" * 60)
     print(f"  Episodes run   : {ep}")
     print(f"  Total steps    : {total_steps:,}")
@@ -194,3 +189,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+

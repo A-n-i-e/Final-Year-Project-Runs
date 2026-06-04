@@ -2,11 +2,13 @@
 train.py
 ========
 Train a PPO agent on the Panda pick-and-lift environment using
-Stable Baselines3.
+Stable Baselines3 (supports PPO, SAC, and DQN).
 
 Usage
 -----
-    python train.py                        # train with defaults
+    To use PPO: python train.py                        # train with defaults
+    To use SAC: python train.py --algo SAC
+    To use TD3: python train.py --algo TD3
     python train.py --timesteps 1000000    # longer run
     python train.py --exp-name my_run      # custom experiment name
 
@@ -21,7 +23,7 @@ import argparse
 import os
 
 import numpy as np
-from stable_baselines3 import PPO
+from stable_baselines3 import PPO, SAC, TD3
 from stable_baselines3.common.callbacks import (
     BaseCallback,
     CheckpointCallback,
@@ -33,6 +35,53 @@ from stable_baselines3.common.vec_env import VecNormalize
 from envs.panda_pick_env import PandaPickEnv
 
 
+# defining hyper parameters so I can easily switch between algorithms 
+
+hyperparams = {
+    "PPO": {
+        "learning_rate": 3e-4,
+        "n_steps": 2048,
+        "batch_size": 256,
+        "n_epochs": 10,
+        "gamma": 0.99,
+        "gae_lambda": 0.95,
+        "clip_range": 0.2,
+        "ent_coef": 0.01,
+        "vf_coef": 0.5,
+        "max_grad_norm": 0.5,
+        "policy_kwargs": dict(net_arch=dict(pi=[256, 256], vf=[256, 256])),
+    },
+    "SAC": {
+        "learning_rate": 3e-4,
+        "buffer_size": 1_000_000,
+        "learning_starts": 1000,
+        "batch_size": 256,
+        "tau": 0.005,
+        "gamma": 0.99,
+        "train_freq": 1,
+        "gradient_steps": 1,
+        "ent_coef": 'auto',
+        "policy_kwargs": dict(net_arch=dict(pi=[256, 256], qf=[256, 256])),
+    },
+    "TD3": {
+        "learning_rate": 3e-4,
+        "buffer_size": 1_000_000,
+        "learning_starts": 1000,
+        "batch_size": 256,
+        "tau": 0.005,
+        "gamma": 0.99,
+        "train_freq": 1,
+        "gradient_steps": 1,
+        "policy_kwargs": dict(net_arch=dict(pi=[256, 256], qf=[256, 256])),
+        #"action_noise": NormalActionNoise(mean=np.zeros(4), sigma=0.1 * np.ones(4)),
+    }
+}
+
+algo_dict ={
+    "PPO": PPO,
+    "SAC": SAC,
+    "TD3": TD3,
+}
 # ---------------------------------------------------------------------------
 # Custom callback: print a short progress line every N rollouts
 # ---------------------------------------------------------------------------
@@ -75,11 +124,17 @@ def parse_args():
     parser.add_argument("--seed",        type=int,   default=42)
     parser.add_argument("--no-normalize",action="store_true",
                         help="Disable VecNormalize (obs + reward normalisation)")
+    parser.add_argument("--algo", type=str, default="PPO", choices=list(hyperparams.keys()),
+                        help="RL algorithm to use (default: PPO)")
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
+
+    if args.exp_name == "panda_ppo" and args.algo != "PPO":
+        args.exp_name = f"panda_{args.algo.lower()}"
+
 
     log_dir   = os.path.join("logs",   args.exp_name)
     model_dir = os.path.join("models", args.exp_name)
@@ -91,7 +146,9 @@ def main():
     print(f"  Timesteps  : {args.timesteps:,}")
     print(f"  Envs       : {args.n_envs}")
     print(f"  Seed       : {args.seed}")
+    print(f"  Algorithm  : {args.algo}")
     print("=" * 60)
+    
 
     # ------------------------------------------------------------------
     # Training environment  (vectorised, optionally normalised)
@@ -136,29 +193,19 @@ def main():
         eval_env.ret_rms = train_env.ret_rms
 
     # ------------------------------------------------------------------
-    # PPO model
+    # Model Selection
     # ------------------------------------------------------------------
-    model = PPO(
+    AlgoClass = algo_dict.get(args.algo)
+    if not AlgoClass:
+        raise ValueError(f"Unknown algorithm: {args.algo}")
+
+    model = AlgoClass(
         policy="MlpPolicy",
         env=train_env,
-        learning_rate=3e-4,
-        n_steps=2048,           # steps per env per rollout
-        batch_size=256,
-        n_epochs=10,
-        gamma=0.99,
-        gae_lambda=0.95,
-        clip_range=0.2,
-        ent_coef=0.01,          # small entropy bonus — helps exploration
-        vf_coef=0.5,
-        max_grad_norm=0.5,
         tensorboard_log=log_dir,
-        verbose=0,
         seed=args.seed,
-        policy_kwargs=dict(
-            net_arch=dict(pi=[256, 256], vf=[256, 256])
-        ),
+        **hyperparams[args.algo]   # This unpacks the right hyperparameters
     )
-
     # ------------------------------------------------------------------
     # Callbacks
     # ------------------------------------------------------------------
@@ -208,10 +255,16 @@ def main():
 
     print("\nDone! To view training curves:")
     print(f"  tensorboard --logdir {log_dir}")
-    print("\nTo visualise the trained agent:")
-    print(f"  python visualise.py --model {model_dir}/best_model.zip")
+    print("\nTo visualize the trained agent:")
+    print(f"  python visualise.py --algo {args.algo}")
+    
     if not args.no_normalize:
-        print(f"             --stats {model_dir}/vec_normalize.pkl")
+        print(f"  (Normalisation stats will be loaded automatically)")
+    
+    print("\nOther useful commands:")
+    print(f"  python visualise.py --algo {args.algo} --episodes 10")
+    print(f"  python visualise.py --algo {args.algo} --object cube --episodes 5")
+    print("="*70)
 
 
 if __name__ == "__main__":

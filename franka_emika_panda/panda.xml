@@ -222,24 +222,29 @@
                         <geom mesh="finger_0" material="off_white" class="visual"/>
                         <geom mesh="finger_1" material="black" class="visual"/>
                         <geom mesh="finger_0" class="collision"/>
-                        <geom class="fingertip_pad_collision_1"/>
-                        <geom class="fingertip_pad_collision_2"/>
-                        <geom class="fingertip_pad_collision_3"/>
-                        <geom class="fingertip_pad_collision_4"/>
-                        <geom class="fingertip_pad_collision_5"/>
-                      </body>
-                      <body name="right_finger" pos="0 0 0.0584" quat="0 0 0 1">
-                        <inertial mass="0.015" pos="0 0 0" diaginertia="2.375e-6 2.375e-6 7.5e-7"/>
-                        <joint name="finger_joint2" class="finger"/>
-                        <geom mesh="finger_0" material="off_white" class="visual"/>
-                        <geom mesh="finger_1" material="black" class="visual"/>
-                        <geom mesh="finger_0" class="collision"/>
-                        <geom class="fingertip_pad_collision_1"/>
-                        <geom class="fingertip_pad_collision_2"/>
-                        <geom class="fingertip_pad_collision_3"/>
-                        <geom class="fingertip_pad_collision_4"/>
-                        <geom class="fingertip_pad_collision_5"/>
-                      </body>
+
+                        <!-- Named finger pads for reliable grasp detection -->
+                        <geom name="left_finger_pad" type="box" 
+                              size="0.008 0.004 0.009" 
+                              pos="0 0.006 0.048" 
+                              rgba="1 0.5 0.5 0.5" 
+                              friction="1.5 0.1 0.01" condim="4"/>
+                    </body>
+
+                    <body name="right_finger" pos="0 0 0.0584" quat="0 0 0 1">
+                      <inertial mass="0.015" pos="0 0 0" diaginertia="2.375e-6 2.375e-6 7.5e-7"/>
+                      <joint name="finger_joint2" class="finger"/>
+                      <geom mesh="finger_0" material="off_white" class="visual"/>
+                      <geom mesh="finger_1" material="black" class="visual"/>
+                      <geom mesh="finger_0" class="collision"/>
+
+                      <!-- Named finger pads for reliable grasp detection -->
+                      <geom name="right_finger_pad" type="box" 
+                            size="0.008 0.004 0.009" 
+                            pos="0 -0.006 0.048" 
+                            rgba="0.5 0.5 1 0.5" 
+                            friction="1.5 0.1 0.01" condim="4"/>
+                    </body>
                     </body>
                   </body>
                 </body>

@@ -154,8 +154,9 @@ The agent outputs Cartesian displacements, not joint angles. An **Inverse Kinema
 
 ### Reward Function
 
-Dense shaped reward guiding the agent through four phases:
+Reward function method was adopted from [ggando's github repo](https://github.com/ggand0/pick-101) on Rl training for SO-101 robot manipulation 
 
+Dense shaped reward guiding the agent through four phases:
 | Phase | Component | Value |
 |-------|-----------|-------|
 | Reach | `1 − tanh(10 × dist(ee, obj))` | [0, 1] |
@@ -322,7 +323,6 @@ Off-policy algorithm with a replay buffer. Maximises both reward and entropy (ra
 
 - Typically fastest to learn on manipulation tasks
 - Automatic entropy coefficient tuning (`ent_coef='auto'`)
-- Requires `n-envs 1`
 
 ### TD3 — Twin Delayed DDPG
 
@@ -330,7 +330,6 @@ Off-policy algorithm. Uses two critic networks (to reduce overestimation bias) a
 
 - More conservative than SAC, often more stable
 - Sensitive to hyperparameters
-- Requires `n-envs 1`
 
 ---
 
@@ -370,9 +369,8 @@ Training curves and per-object success breakdowns are available in `results/` af
 
 ## References
 
-- Schulman, J. et al. (2017). *Proximal Policy Optimization Algorithms.* arXiv:1707.06347
-- Haarnoja, T. et al. (2018). *Soft Actor-Critic.* arXiv:1801.01290
-- Fujimoto, S. et al. (2018). *Addressing Function Approximation Error in Actor-Critic Methods (TD3).* arXiv:1802.09477
 - MuJoCo Menagerie: https://github.com/google-deepmind/mujoco_menagerie
-- Stable Baselines3: https://github.com/DLR-RM/stable-baselines3
-- JericLew/Push_MuJoCo (IK reference): https://github.com/JericLew/Push_MuJoCo
+- JericLew/Push_MuJoCo: https://github.com/JericLew/Push_MuJoCo
+- Google Deepmind's dm_control (Inverse Kinematics Implementation): https://github.com/DLR-RM/stable-baselines3
+- ggand0/pick-101: https://github.com/ggand0/pick-101
+- ggand0 blog (which I found first before his GitHub):https://ggando.com/blog/so101-rl-lift/ 
